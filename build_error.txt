@@ -1,0 +1,16 @@
+
+> vite_react_shadcn_ts@0.0.0 build
+> vite build
+
+E0000 00:00:1768391098.060185   22652 ctxmenu.cc:220] UNKNOWN: From legacy status [type.googleapis.com/drive.ds.Status='UNKNOWN_STATUS']
+=== Source Location Trace: ===
+apps/drive/fs/ipc/shell_ipc_client.cc:630
+[31mfailed to load config from D:\real pro\jo\pulse-diplomacy-hub-main\vite.config.ts[39m
+[31merror during build:
+Error: The service was stopped
+    at D:\real pro\jo\pulse-diplomacy-hub-main\node_modules\esbuild\lib\main.js:968:34
+    at responseCallbacks.<computed> (D:\real pro\jo\pulse-diplomacy-hub-main\node_modules\esbuild\lib\main.js:622:9)
+    at Socket.afterClose (D:\real pro\jo\pulse-diplomacy-hub-main\node_modules\esbuild\lib\main.js:613:28)
+    at Socket.emit (node:events:520:35)
+    at endReadableNT (node:internal/streams/readable:1701:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)[39m

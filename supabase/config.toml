@@ -1,0 +1,4 @@
+project_id = "grgtrnkyonuocxesstrf"
+
+[functions.submit-application]
+verify_jwt = false
