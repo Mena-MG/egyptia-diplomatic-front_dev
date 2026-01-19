@@ -67,7 +67,6 @@ export default function EventsManagementPage() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
-      // @ts-ignore
       const { error } = await supabase.from('events').insert({
         ...formData,
         created_by: user.user?.id,
@@ -107,7 +106,6 @@ export default function EventsManagementPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // @ts-ignore
       const { error } = await supabase.from('events').delete().eq('id', id);
       if (error) throw error;
     },

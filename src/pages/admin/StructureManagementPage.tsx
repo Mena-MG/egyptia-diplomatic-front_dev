@@ -93,7 +93,6 @@ export default function StructureManagementPage() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
-      // @ts-ignore
       const { error } = await supabase.from('organizational_structure').insert({
         ...formData,
         committee_id: formData.role === 'committee_head' || formData.role === 'committee_deputy'
@@ -141,7 +140,6 @@ export default function StructureManagementPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // @ts-ignore
       const { error } = await supabase.from('organizational_structure').delete().eq('id', id);
       if (error) throw error;
     },

@@ -88,7 +88,6 @@ export default function InterviewsPage() {
     queryKey: ['interviews', searchQuery, statusFilter],
     queryFn: async () => {
       let query = supabase
-        // @ts-ignore
         .from('interviews')
         .select(`
           *,
@@ -110,7 +109,6 @@ export default function InterviewsPage() {
   const updateInterviewMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Record<string, any> }) => {
       const { error } = await supabase
-        // @ts-ignore
         .from('interviews')
         .update(updates)
         .eq('id', id);

@@ -39,7 +39,6 @@ export default function OrganizationalStructurePage() {
   const { data: structure, isLoading } = useQuery({
     queryKey: ['organizational-structure-public'],
     queryFn: async () => {
-      // @ts-ignore
       const { data } = await supabase
         .from('organizational_structure')
         .select('*, committees:committee_id(id, name_ar, name_en)')

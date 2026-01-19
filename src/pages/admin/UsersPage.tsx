@@ -25,7 +25,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -48,26 +59,179 @@ export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '', role: 'hr' });
 
+  // Edit user state
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editRole, setEditRole] = useState('hr');
+
+  // Confirm action states
+  const [userToToggle, setUserToToggle] = useState<any>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<any>(null);
+
+
   const { data: users, isLoading } = useQuery({
     queryKey: ['hr-users'],
     queryFn: async () => {
-      const { data } = await supabase
+      // Fetch hr_profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('hr_profiles')
-        .select('*, user_roles:user_roles(role)')
+        .select('*')
         .order('created_at', { ascending: false });
-      return data || [];
+
+      if (profilesError) throw profilesError;
+
+      // Fetch all user_roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+
+      if (rolesError) throw rolesError;
+
+      // Join profiles with roles manually
+      const usersWithRoles = (profiles || []).map(profile => ({
+        ...profile,
+        user_roles: roles?.filter(r => r.user_id === profile.user_id) || []
+      }));
+
+      return usersWithRoles;
     },
   });
 
   const createUserMutation = useMutation({
     mutationFn: async () => {
-      // Note: In production, this should be done via an edge function with admin privileges
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUser.email,
+          password: newUser.password,
+          fullName: newUser.fullName,
+          role: newUser.role,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create user');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-users'] });
       toast({
-        title: 'Info',
-        description: 'User creation requires admin API. Please create users via Supabase dashboard.',
+        title: t('common', 'success'),
+        description: 'User created successfully!',
+      });
+      setIsDialogOpen(false);
+      setNewUser({ email: '', password: '', fullName: '', role: 'hr' });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t('common', 'error'),
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
+
+  // Update user role mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'hr' | 'admin' }) => {
+      // First, delete existing role
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      // Then insert new role
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({ user_id: userId, role: newRole });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-users'] });
+      toast({
+        title: t('common', 'success'),
+        description: 'User role updated successfully!',
+      });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t('common', 'error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Toggle user active status mutation
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from('hr_profiles')
+        .update({ is_active: !isActive })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-users'] });
+      toast({
+        title: t('common', 'success'),
+        description: 'User status updated!',
+      });
+      setUserToToggle(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t('common', 'error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Reset password mutation (sends reset email)
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: t('common', 'success'),
+        description: 'Password reset email sent!',
+      });
+      setUserToResetPassword(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t('common', 'error'),
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
+    setEditRole(user.user_roles?.[0]?.role || 'hr');
+    setIsEditDialogOpen(true);
+  };
 
   const filteredUsers = users?.filter(u =>
     u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -224,9 +388,18 @@ export default function UsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align={isRTL ? 'start' : 'end'}>
-                            <DropdownMenuItem>{t('common', 'edit')}</DropdownMenuItem>
-                            <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Disable</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                              {t('common', 'edit')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setUserToResetPassword(user)}>
+                              Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className={user.is_active ? 'text-destructive' : 'text-green-500'}
+                              onClick={() => setUserToToggle(user)}
+                            >
+                              {user.is_active ? 'Disable' : 'Enable'}
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -237,6 +410,89 @@ export default function UsersPage() {
             </Table>
           </Card>
         </motion.div>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>
+                Change the role for {editingUser?.full_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hr">HR</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => editingUser && updateRoleMutation.mutate({
+                  userId: editingUser.user_id,
+                  newRole: editRole as 'hr' | 'admin'
+                })}
+                disabled={updateRoleMutation.isPending}
+              >
+                {updateRoleMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset Password Confirmation */}
+        <AlertDialog open={!!userToResetPassword} onOpenChange={(open) => !open && setUserToResetPassword(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Password</AlertDialogTitle>
+              <AlertDialogDescription>
+                Send a password reset email to {userToResetPassword?.email}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => userToResetPassword && resetPasswordMutation.mutate(userToResetPassword.email)}
+              >
+                Send Reset Email
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Toggle Active Confirmation */}
+        <AlertDialog open={!!userToToggle} onOpenChange={(open) => !open && setUserToToggle(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {userToToggle?.is_active ? 'Disable User' : 'Enable User'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to {userToToggle?.is_active ? 'disable' : 'enable'} {userToToggle?.full_name}?
+                {userToToggle?.is_active && ' They will no longer be able to access the system.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className={userToToggle?.is_active ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                onClick={() => userToToggle && toggleActiveMutation.mutate({
+                  id: userToToggle.id,
+                  isActive: userToToggle.is_active
+                })}
+              >
+                {userToToggle?.is_active ? 'Disable' : 'Enable'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </HRLayout>
   );
