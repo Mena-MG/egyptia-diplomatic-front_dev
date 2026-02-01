@@ -35,6 +35,11 @@ import HRLayout from '@/components/layout/HRLayout';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type OrganizationalStructureRow = Database['public']['Tables']['organizational_structure']['Row'] & {
+  committees?: { id: string; name_ar: string; name_en: string };
+};
 
 const roleLabels: Record<string, { ar: string; en: string; icon: LucideIcon }> = {
   president: { ar: 'رئيس الكيان', en: 'President', icon: Crown },
@@ -49,7 +54,7 @@ export default function StructureManagementPage() {
   const queryClient = useQueryClient();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<any>(null);
+  const [editingMember, setEditingMember] = useState<OrganizationalStructureRow | null>(null);
   const [deleteMemberId, setDeleteMemberId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -171,7 +176,7 @@ export default function StructureManagementPage() {
     });
   };
 
-  const handleEdit = (member: any) => {
+  const handleEdit = (member: OrganizationalStructureRow) => {
     setEditingMember(member);
     setFormData({
       full_name_ar: member.full_name_ar || '',
@@ -203,8 +208,7 @@ export default function StructureManagementPage() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const groupedStructure = structure?.reduce((acc: any, member: any) => {
+  const groupedStructure = structure?.reduce((acc: Record<string, OrganizationalStructureRow[]>, member: OrganizationalStructureRow) => {
     if (!acc[member.role]) acc[member.role] = [];
     acc[member.role].push(member);
     return acc;
@@ -270,7 +274,7 @@ export default function StructureManagementPage() {
                   <Label>الدور *</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value: any) => setFormData({ ...formData, role: value, committee_id: '' })}
+                    onValueChange={(value) => setFormData({ ...formData, role: value as any, committee_id: '' })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -406,7 +410,7 @@ export default function StructureManagementPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {members.map((member: any) => (
+                      {members.map((member: OrganizationalStructureRow) => (
                         <div key={member.id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">

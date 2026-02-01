@@ -29,6 +29,7 @@ interface HRLayoutProps {
 const hrNavItems = [
   { icon: LayoutDashboard, labelKey: 'dashboard', href: '/hr/dashboard' },
   { icon: Users2, labelKey: 'evaluations', href: '/hr/evaluations' },
+  { icon: Calendar, labelKey: 'interviews', href: '/hr/interviews' },
   { icon: Users, labelKey: 'applicants', href: '/hr/applications' },
   { icon: BarChart3, labelKey: 'reports', href: '/hr/reports' },
   { icon: Settings, labelKey: 'settings', href: '/admin/settings' },
@@ -79,7 +80,7 @@ export default function HRLayout({ children }: HRLayoutProps) {
 
   const isActive = (href: string) => location.pathname === href;
 
-  const userName = 'Ahmed Hassan';
+  const userName = user?.user_metadata?.full_name || user?.email || 'User';
   const userRole = isAdmin ? 'Admin' : t('common', 'hrManager');
 
   const SidebarContent = () => (
@@ -106,11 +107,10 @@ export default function HRLayout({ children }: HRLayoutProps) {
                   <Link
                     key={item.href}
                     to={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      active
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${active
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
                     <span className="text-sm font-medium">{t('nav', item.labelKey)}</span>
@@ -138,11 +138,10 @@ export default function HRLayout({ children }: HRLayoutProps) {
                   <Link
                     key={item.href}
                     to={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                      active
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${active
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-5 h-5 flex-shrink-0" />
                     <span className="text-sm font-medium">{t('nav', item.labelKey)}</span>
@@ -210,8 +209,8 @@ export default function HRLayout({ children }: HRLayoutProps) {
               className={`fixed top-0 ${isRTL ? 'right-0' : 'left-0'} h-full w-64 bg-sidebar z-50 lg:hidden`}
             >
               <div className="absolute top-4 right-4">
-                <button 
-                  onClick={() => setIsSidebarOpen(false)} 
+                <button
+                  onClick={() => setIsSidebarOpen(false)}
                   className="p-2 rounded-lg hover:bg-sidebar-accent"
                 >
                   <X className="w-5 h-5" />

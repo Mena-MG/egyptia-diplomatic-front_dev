@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
   Calendar,
   MoreHorizontal,
   ChevronLeft,
@@ -45,6 +45,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+
+import * as XLSX from 'xlsx';
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -150,6 +152,26 @@ export default function ApplicationsPage() {
     return language === 'ar' ? committee.name_ar : committee.name_en;
   };
 
+  const handleExport = () => {
+    const dataToExport = applications.map(app => ({
+      'Full Name': app.full_name,
+      'Email': app.email,
+      'Phone': app.phone,
+      'Location': `${app.city || ''}, ${app.governorate || ''}`,
+      'Age': app.age,
+      'Education': app.education,
+      'Experience': app.experience,
+      'Committee': getCommitteeName(app.committees as any),
+      'Status': t('applicationStatus', app.status),
+      'Date Submitted': formatDate(app.created_at),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Applications');
+    XLSX.writeFile(wb, 'Applications.xlsx');
+  };
+
   return (
     <HRLayout>
       <div className="space-y-6">
@@ -168,9 +190,9 @@ export default function ApplicationsPage() {
               <RefreshCw className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
               Refresh
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-              {t('applications', 'exportCSV')}
+              Export Excel
             </Button>
           </div>
         </div>

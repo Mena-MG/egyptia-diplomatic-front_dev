@@ -49,7 +49,10 @@ export default function EvaluationsPage() {
   const { data: members } = useQuery({
     queryKey: ['members-list'],
     queryFn: async () => {
-      const { data } = await supabase.from('members').select('id, full_name').eq('status', 'active');
+      const { data } = await supabase
+        .from('members')
+        .select('id, full_name')
+        .order('full_name');
       return data || [];
     },
   });

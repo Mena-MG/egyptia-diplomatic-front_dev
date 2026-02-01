@@ -51,6 +51,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type Interview = Database['public']['Tables']['interviews']['Row'] & {
+  applicant?: { id: string; full_name: string; email: string; phone: string };
+};
 
 const statusColors: Record<string, string> = {
   scheduled: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -69,7 +74,7 @@ export default function InterviewsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedInterview, setSelectedInterview] = useState<any>(null);
+  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
 
   // Evaluation form state
@@ -107,7 +112,7 @@ export default function InterviewsPage() {
 
   // Update interview mutation
   const updateInterviewMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, any> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Database['public']['Tables']['interviews']['Update']> }) => {
       const { error } = await supabase
         .from('interviews')
         .update(updates)
@@ -144,7 +149,7 @@ export default function InterviewsPage() {
   };
 
   // Reset evaluation when selecting a different interview
-  const openEvaluationDialog = (interview: any) => {
+  const openEvaluationDialog = (interview: Interview) => {
     setSelectedInterview(interview);
     setEvaluation({
       communication: interview.score_communication ?? 5,
@@ -158,7 +163,7 @@ export default function InterviewsPage() {
     setIsEvaluationOpen(true);
   };
 
-  const generateWhatsAppMessage = (interview: any) => {
+  const generateWhatsAppMessage = (interview: Interview) => {
     const date = format(new Date(interview.scheduled_at), 'EEEE, MMMM d, yyyy', { locale: language === 'ar' ? ar : undefined });
     const time = format(new Date(interview.scheduled_at), 'h:mm a', { locale: language === 'ar' ? ar : undefined });
 
@@ -399,9 +404,39 @@ export default function InterviewsPage() {
                             </div>
                           ))}
                           {dayInterviews.length > 2 && (
-                            <div className="text-xs text-muted-foreground">
-                              +{dayInterviews.length - 2} more
-                            </div>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <div className="text-xs text-muted-foreground cursor-pointer hover:text-primary transition-colors font-medium">
+                                  +{dayInterviews.length - 2} more
+                                </div>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>
+                                    {format(day, 'EEEE, MMMM d, yyyy', { locale: language === 'ar' ? ar : undefined })}
+                                  </DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-2 mt-2">
+                                  {dayInterviews.map((interview) => (
+                                    <div
+                                      key={interview.id}
+                                      className="flex items-center justify-between p-2 rounded-lg border border-border hover:bg-muted/50 cursor-pointer"
+                                      onClick={() => openEvaluationDialog(interview)}
+                                    >
+                                      <div>
+                                        <p className="font-medium text-sm">{interview.applicant?.full_name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {format(new Date(interview.scheduled_at), 'h:mm a')}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className={statusColors[interview.status]}>
+                                        {t('interviewStatus', interview.status)}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
                           )}
                         </div>
                       </div>

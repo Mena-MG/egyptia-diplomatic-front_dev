@@ -50,6 +50,11 @@ import HRLayout from '@/components/layout/HRLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type HRProfileWithRoles = Database['public']['Tables']['hr_profiles']['Row'] & {
+  user_roles: Database['public']['Tables']['user_roles']['Row'][];
+};
 
 export default function UsersPage() {
   const { t, isRTL } = useLanguage();
@@ -60,13 +65,13 @@ export default function UsersPage() {
   const [newUser, setNewUser] = useState({ email: '', password: '', fullName: '', role: 'hr' });
 
   // Edit user state
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<HRProfileWithRoles | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editRole, setEditRole] = useState('hr');
 
   // Confirm action states
-  const [userToToggle, setUserToToggle] = useState<any>(null);
-  const [userToResetPassword, setUserToResetPassword] = useState<any>(null);
+  const [userToToggle, setUserToToggle] = useState<HRProfileWithRoles | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<HRProfileWithRoles | null>(null);
 
 
   const { data: users, isLoading } = useQuery({
@@ -227,7 +232,7 @@ export default function UsersPage() {
     },
   });
 
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: HRProfileWithRoles) => {
     setEditingUser(user);
     setEditRole(user.user_roles?.[0]?.role || 'hr');
     setIsEditDialogOpen(true);

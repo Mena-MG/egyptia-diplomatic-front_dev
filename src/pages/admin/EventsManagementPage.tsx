@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import type { Database } from '@/integrations/supabase/types';
 
 export default function EventsManagementPage() {
   const { t, language, isRTL } = useLanguage();
@@ -37,8 +38,7 @@ export default function EventsManagementPage() {
   const queryClient = useQueryClient();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [editingEvent, setEditingEvent] = useState<Database['public']['Tables']['events']['Row'] | null>(null);
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -69,6 +69,7 @@ export default function EventsManagementPage() {
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase.from('events').insert({
         ...formData,
+        event_date: formData.event_date || null,
         created_by: user.user?.id,
       });
       if (error) throw error;
@@ -88,7 +89,10 @@ export default function EventsManagementPage() {
     mutationFn: async () => {
       const { error } = await supabase
         .from('events')
-        .update(formData)
+        .update({
+          ...formData,
+          event_date: formData.event_date || null,
+        })
         .eq('id', editingEvent.id);
       if (error) throw error;
     },
@@ -131,8 +135,7 @@ export default function EventsManagementPage() {
     });
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleEdit = (event: any) => {
+  const handleEdit = (event: Database['public']['Tables']['events']['Row']) => {
     setEditingEvent(event);
     setFormData({
       title_ar: event.title_ar || '',

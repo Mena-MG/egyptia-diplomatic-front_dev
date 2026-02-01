@@ -49,10 +49,9 @@ export default function OrganizationalStructurePage() {
     },
   });
 
-  const groupedStructure = structure?.reduce((acc: Record<string, OrganizationMember[]>, member: any) => {
-    const typedMember = member as OrganizationMember;
-    if (!acc[typedMember.role]) acc[typedMember.role] = [];
-    acc[typedMember.role].push(typedMember);
+  const groupedStructure = structure?.reduce((acc: Record<string, OrganizationMember[]>, member: OrganizationMember) => {
+    if (!acc[member.role]) acc[member.role] = [];
+    acc[member.role].push(member);
     return acc;
   }, {});
 
