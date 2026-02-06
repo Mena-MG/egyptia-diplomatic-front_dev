@@ -6,10 +6,10 @@ import logo from "@/assets/logo.png";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { href: "#about", label: "من نحن" },
-  { href: "#activities", label: "أنشطتنا" },
+  { href: "/#about", label: "من نحن" },
+  { href: "/#activities", label: "أنشطتنا" },
   { href: "/structure", label: "الهيكل الإداري" },
-  { href: "#join", label: "انضم إلينا" },
+  { href: "/#join", label: "انضم إلينا" },
 ];
 
 const Navbar = () => {
@@ -31,13 +31,13 @@ const Navbar = () => {
         animate={{ y: 0 }}
         transition={{ duration: 0.6 }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
-            ? "bg-background/90 backdrop-blur-lg border-b border-border/50"
-            : "bg-transparent"
+          ? "bg-background/90 backdrop-blur-lg border-b border-border/50"
+          : "bg-transparent"
           }`}
       >
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <img
               src={logo}
               alt="الجبهة الدبلوماسية المصرية"
@@ -51,35 +51,25 @@ const Navbar = () => {
                 Egyptian Diplomatic Front
               </p>
             </div>
-          </a>
+          </Link>
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) =>
-              link.href.startsWith('/') ? (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className="text-foreground/80 hover:text-primary transition-colors font-medium"
-                >
-                  {link.label}
-                </Link>
-              ) : (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="text-foreground/80 hover:text-primary transition-colors font-medium"
-                >
-                  {link.label}
-                </a>
-              )
-            )}
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="text-foreground/80 hover:text-primary transition-colors font-medium"
+              >
+                {link.label}
+              </Link>
+            ))}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" asChild className="border-primary text-secondary hover:bg-primary hover:text-white">
                 <Link to="/login">تسجيل الدخول</Link>
               </Button>
               <Button variant="gold" size="sm" asChild>
-                <a href="#join">انضم الآن</a>
+                <Link to="/#join">انضم الآن</Link>
               </Button>
             </div>
           </nav>
@@ -105,27 +95,16 @@ const Navbar = () => {
             className="fixed inset-0 z-40 bg-background/98 backdrop-blur-lg md:hidden pt-24"
           >
             <nav className="flex flex-col items-center gap-6 p-8">
-              {navLinks.map((link) =>
-                link.href.startsWith('/') ? (
-                  <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-xl text-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                ) : (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-xl text-foreground hover:text-primary transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                )
-              )}
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-xl text-foreground hover:text-primary transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
               <div className="flex flex-col gap-4 w-full">
                 <Button variant="outline" size="lg" asChild className="w-full border-primary text-secondary hover:bg-primary hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
                   <Link to="/login">تسجيل الدخول</Link>
@@ -137,7 +116,7 @@ const Navbar = () => {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full"
                 >
-                  <a href="#join">انضم الآن</a>
+                  <Link to="/#join">انضم الآن</Link>
                 </Button>
               </div>
             </nav>
