@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Calendar as CalendarIcon,
@@ -203,9 +204,11 @@ export default function InterviewsPage() {
               {t('interviews', 'subtitle')}
             </p>
           </div>
-          <Button>
-            <Plus className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
-            {t('interviews', 'scheduleNew')}
+          <Button asChild>
+            <Link to="/hr/interviews/new">
+              <Plus className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+              {t('interviews', 'scheduleNew')}
+            </Link>
           </Button>
         </div>
 

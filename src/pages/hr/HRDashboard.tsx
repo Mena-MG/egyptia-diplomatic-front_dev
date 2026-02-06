@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { 
-  Users2, 
-  Lightbulb, 
-  Calendar, 
-  CheckCircle2, 
+import {
+  Users2,
+  Lightbulb,
+  Calendar,
+  CheckCircle2,
   TrendingUp,
   Download,
   Video,
@@ -19,49 +19,49 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data for charts
-const statusData = [
-  { name: 'Under Review', value: 25, color: '#D4A853' },
-  { name: 'New', value: 20, color: '#3B82F6' },
-  { name: 'Hired', value: 25, color: '#22C55E' },
-  { name: 'Rejected', value: 30, color: '#EF4444' },
-];
+// Status color mappings for pie chart
+const statusColorMap: Record<string, string> = {
+  new: '#3B82F6',
+  screening: '#D4A853',
+  interview_scheduled: '#8B5CF6',
+  interview_completed: '#6366F1',
+  accepted: '#22C55E',
+  rejected: '#EF4444',
+  waitlist: '#F97316',
+  onboarding: '#06B6D4',
+  withdrawn: '#6B7280',
+};
 
-const activityData = [
-  { month: 'Jan', value: 80 },
-  { month: 'Feb', value: 90 },
-  { month: 'Mar', value: 100 },
-  { month: 'Apr', value: 95 },
-  { month: 'May', value: 120 },
-  { month: 'Jun', value: 180 },
-];
+const statusLabelMap: Record<string, string> = {
+  new: 'New',
+  screening: 'Under Review',
+  interview_scheduled: 'Interview Scheduled',
+  interview_completed: 'Interview Completed',
+  accepted: 'Hired',
+  rejected: 'Rejected',
+  waitlist: 'Waitlist',
+  onboarding: 'Onboarding',
+  withdrawn: 'Withdrawn',
+};
 
-const upcomingInterviews = [
-  { id: 1, name: 'Youssef Ali', position: 'Cultural Attaché', time: '10:00 AM', date: 'OCT 24' },
-  { id: 2, name: 'Sarah Moamen', position: 'Youth Ambassador', time: '01:30 PM', date: 'OCT 24' },
-  { id: 3, name: 'Karim Abdelrahman', position: 'Policy Analyst', time: '09:00 AM', date: 'OCT 25' },
-];
-
-const recentEvaluations = [
-  { id: 1, name: 'Khaled M.', position: 'Policy Analyst', score: 92, status: 'hired' },
-  { id: 2, name: 'Fatima E.', position: 'Youth Amb.', score: null, status: 'pending' },
-  { id: 3, name: 'Nour I.', position: 'Comm. Officer', score: 68, status: 'rejected' },
-];
-
-function StatCard({ 
-  title, 
-  value, 
+function StatCard({
+  title,
+  value,
   subtitle,
   icon: Icon,
   iconColor = 'text-muted-foreground',
   iconBg = 'bg-muted',
   trend,
   target,
-  delay = 0 
-}: { 
-  title: string; 
-  value: string | number; 
+  delay = 0
+}: {
+  title: string;
+  value: string | number;
   subtitle?: string;
   icon: React.ElementType;
   iconColor?: string;
@@ -107,8 +107,10 @@ function StatCard({
 }
 
 export default function HRDashboard() {
-  const { t, isRTL } = useLanguage();
+  const { t, language, isRTL } = useLanguage();
+  const { toast } = useToast();
 
+  // Fetch dashboard stats
   const { data: stats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
@@ -121,13 +123,171 @@ export default function HRDashboard() {
       const interviews = interviewsRes.data || [];
 
       return {
-        totalApplicants: applicants.length || 1248,
-        newApplications: applicants.filter(a => a.status === 'new').length || 45,
-        interviewsScheduled: interviews.filter(i => i.status === 'scheduled').length || 18,
-        hiredThisYear: applicants.filter(a => a.status === 'accepted').length || 156,
+        totalApplicants: applicants.length,
+        newApplications: applicants.filter(a => a.status === 'new').length,
+        interviewsScheduled: interviews.filter(i => i.status === 'scheduled').length,
+        hiredThisYear: applicants.filter(a => a.status === 'accepted').length,
       };
     },
   });
+
+  // Fetch applicants by status for pie chart
+  const { data: statusData } = useQuery({
+    queryKey: ['applicants-by-status'],
+    queryFn: async () => {
+      const { data } = await supabase.from('applicants').select('status');
+      const statusCounts: Record<string, number> = {};
+
+      (data || []).forEach(a => {
+        statusCounts[a.status] = (statusCounts[a.status] || 0) + 1;
+      });
+
+      const total = data?.length || 0;
+      return Object.entries(statusCounts).map(([status, count]) => ({
+        name: statusLabelMap[status] || status,
+        value: total > 0 ? Math.round((count / total) * 100) : 0,
+        color: statusColorMap[status] || '#6B7280',
+        count,
+      }));
+    },
+  });
+
+  // Fetch monthly activity for bar chart (last 6 months)
+  const { data: activityData } = useQuery({
+    queryKey: ['recruitment-activity'],
+    queryFn: async () => {
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = subMonths(new Date(), i);
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
+
+        const { count } = await supabase
+          .from('applicants')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', monthStart.toISOString())
+          .lte('created_at', monthEnd.toISOString());
+
+        months.push({
+          month: format(monthDate, 'MMM'),
+          value: count || 0,
+        });
+      }
+      return months;
+    },
+  });
+
+  // Fetch upcoming interviews
+  const { data: upcomingInterviews } = useQuery({
+    queryKey: ['upcoming-interviews-dashboard'],
+    queryFn: async () => {
+      const today = new Date().toISOString();
+      const { data } = await supabase
+        .from('interviews')
+        .select(`
+          id,
+          scheduled_at,
+          location,
+          applicant:applicant_id(full_name, committee_preference)
+        `)
+        .eq('status', 'scheduled')
+        .gte('scheduled_at', today)
+        .order('scheduled_at', { ascending: true })
+        .limit(3);
+
+      return (data || []).map((interview: any) => ({
+        id: interview.id,
+        name: interview.applicant?.full_name || 'Unknown',
+        position: 'Applicant',
+        time: format(new Date(interview.scheduled_at), 'hh:mm a'),
+        date: format(new Date(interview.scheduled_at), 'MMM dd').toUpperCase(),
+      }));
+    },
+  });
+
+  // Fetch recent evaluations (completed interviews with scores)
+  const { data: recentEvaluations } = useQuery({
+    queryKey: ['recent-evaluations-dashboard'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('interviews')
+        .select(`
+          id,
+          total_score,
+          recommendation,
+          applicant:applicant_id(full_name)
+        `)
+        .not('total_score', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(3);
+
+      return (data || []).map((interview: any) => ({
+        id: interview.id,
+        name: interview.applicant?.full_name || 'Unknown',
+        position: 'Applicant',
+        score: interview.total_score ? Math.round((interview.total_score / 50) * 100) : null,
+        status: interview.recommendation === 'accept' ? 'hired'
+          : interview.recommendation === 'reject' ? 'rejected'
+            : 'pending',
+      }));
+    },
+  });
+
+  // Export handler
+  const handleExport = async () => {
+    try {
+      // Fetch all data for export
+      const [applicantsRes, interviewsRes] = await Promise.all([
+        supabase.from('applicants').select('*'),
+        supabase.from('interviews').select('*, applicant:applicant_id(full_name, email)'),
+      ]);
+
+      const applicants = applicantsRes.data || [];
+      const interviews = interviewsRes.data || [];
+
+      // Create applicants sheet
+      const applicantsData = applicants.map(a => ({
+        'Full Name': a.full_name,
+        'Email': a.email,
+        'Phone': a.phone,
+        'City': a.city,
+        'Governorate': a.governorate,
+        'Age': a.age,
+        'Education': a.education,
+        'Experience': a.experience || '',
+        'Status': a.status,
+        'Created At': format(new Date(a.created_at), 'yyyy-MM-dd HH:mm'),
+      }));
+
+      // Create interviews sheet
+      const interviewsData = interviews.map((i: any) => ({
+        'Applicant Name': i.applicant?.full_name || 'N/A',
+        'Email': i.applicant?.email || 'N/A',
+        'Scheduled At': format(new Date(i.scheduled_at), 'yyyy-MM-dd HH:mm'),
+        'Status': i.status,
+        'Location': i.location || 'N/A',
+        'Total Score': i.total_score || 'N/A',
+        'Recommendation': i.recommendation || 'N/A',
+      }));
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      const wsApplicants = XLSX.utils.json_to_sheet(applicantsData);
+      const wsInterviews = XLSX.utils.json_to_sheet(interviewsData);
+
+      XLSX.utils.book_append_sheet(wb, wsApplicants, 'Applicants');
+      XLSX.utils.book_append_sheet(wb, wsInterviews, 'Interviews');
+
+      // Download file
+      XLSX.writeFile(wb, `HR_Dashboard_Report_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+
+      toast({ title: t('common', 'success'), description: 'Report exported successfully' });
+    } catch (error) {
+      toast({ title: t('common', 'error'), description: 'Failed to export report', variant: 'destructive' });
+    }
+  };
+
+  const totalApplicants = statusData?.reduce((sum, item) => sum + (item.count || 0), 0) || 0;
 
   return (
     <HRLayout>
@@ -142,7 +302,7 @@ export default function HRDashboard() {
               {t('dashboard', 'welcomeMessage')}
             </p>
           </div>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleExport}>
             <Download className="w-4 h-4" />
             {t('dashboard', 'exportReport')}
           </Button>
@@ -152,7 +312,7 @@ export default function HRDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title={t('dashboard', 'totalApplicants')}
-            value={stats?.totalApplicants?.toLocaleString() || '1,248'}
+            value={stats?.totalApplicants?.toLocaleString() || '0'}
             trend={{ value: '+12% since last month', positive: true }}
             icon={Users2}
             iconBg="bg-purple-500/10"
@@ -161,7 +321,7 @@ export default function HRDashboard() {
           />
           <StatCard
             title={t('dashboard', 'newApplications')}
-            value={stats?.newApplications || 45}
+            value={stats?.newApplications || 0}
             trend={{ value: '+5% since last week', positive: true }}
             icon={Lightbulb}
             iconBg="bg-yellow-500/10"
@@ -170,7 +330,7 @@ export default function HRDashboard() {
           />
           <StatCard
             title={t('dashboard', 'interviewsScheduled')}
-            value={stats?.interviewsScheduled || 18}
+            value={stats?.interviewsScheduled || 0}
             subtitle="For the next 7 days"
             icon={Calendar}
             iconBg="bg-blue-500/10"
@@ -179,8 +339,8 @@ export default function HRDashboard() {
           />
           <StatCard
             title={t('dashboard', 'hiredThisYear')}
-            value={stats?.hiredThisYear || 156}
-            target={{ current: 156, max: 200 }}
+            value={stats?.hiredThisYear || 0}
+            target={{ current: stats?.hiredThisYear || 0, max: 200 }}
             icon={CheckCircle2}
             iconBg="bg-green-500/10"
             iconColor="text-green-400"
@@ -208,7 +368,7 @@ export default function HRDashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={statusData}
+                          data={statusData || []}
                           cx="50%"
                           cy="50%"
                           innerRadius={50}
@@ -216,22 +376,22 @@ export default function HRDashboard() {
                           dataKey="value"
                           strokeWidth={0}
                         >
-                          {statusData.map((entry, index) => (
+                          {(statusData || []).map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold">1.2k</span>
+                      <span className="text-2xl font-bold">{totalApplicants > 999 ? `${(totalApplicants / 1000).toFixed(1)}k` : totalApplicants}</span>
                       <span className="text-xs text-muted-foreground">Total</span>
                     </div>
                   </div>
                   <div className="space-y-3">
-                    {statusData.map((item) => (
+                    {(statusData || []).map((item) => (
                       <div key={item.name} className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
+                        <div
+                          className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: item.color }}
                         />
                         <span className="text-sm text-muted-foreground">
@@ -269,10 +429,10 @@ export default function HRDashboard() {
               <CardContent>
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={activityData}>
-                      <XAxis 
-                        dataKey="month" 
-                        axisLine={false} 
+                    <BarChart data={activityData || []}>
+                      <XAxis
+                        dataKey="month"
+                        axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#6B7280', fontSize: 12 }}
                       />
@@ -284,9 +444,9 @@ export default function HRDashboard() {
                           borderRadius: '8px',
                         }}
                       />
-                      <Bar 
-                        dataKey="value" 
-                        fill="hsl(43, 74%, 52%)" 
+                      <Bar
+                        dataKey="value"
+                        fill="hsl(43, 74%, 52%)"
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
@@ -315,7 +475,9 @@ export default function HRDashboard() {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                {upcomingInterviews.map((interview) => (
+                {(upcomingInterviews || []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No upcoming interviews</p>
+                ) : (upcomingInterviews || []).map((interview) => (
                   <div
                     key={interview.id}
                     className="flex items-center gap-4 p-3 rounded-lg bg-muted/30"
@@ -366,8 +528,10 @@ export default function HRDashboard() {
                     <span className="text-center">{t('common', 'score')}</span>
                     <span className={isRTL ? 'text-left' : 'text-right'}>{t('common', 'status')}</span>
                   </div>
-                  
-                  {recentEvaluations.map((evaluation) => (
+
+                  {(recentEvaluations || []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No evaluations yet</p>
+                  ) : (recentEvaluations || []).map((evaluation) => (
                     <div
                       key={evaluation.id}
                       className="grid grid-cols-3 gap-4 items-center p-3 rounded-lg hover:bg-muted/30 transition-colors"
@@ -385,27 +549,25 @@ export default function HRDashboard() {
                         </div>
                       </div>
                       <div className="text-center">
-                        <span className={`text-sm font-medium ${
-                          evaluation.score && evaluation.score >= 70 
-                            ? 'text-green-500' 
-                            : evaluation.score 
-                              ? 'text-red-500' 
-                              : 'text-muted-foreground'
-                        }`}>
+                        <span className={`text-sm font-medium ${evaluation.score && evaluation.score >= 70
+                          ? 'text-green-500'
+                          : evaluation.score
+                            ? 'text-red-500'
+                            : 'text-muted-foreground'
+                          }`}>
                           {evaluation.score ? `${evaluation.score}/100` : '--/100'}
                         </span>
                       </div>
                       <div className={isRTL ? 'text-left' : 'text-right'}>
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          evaluation.status === 'hired' 
-                            ? 'bg-green-500/10 text-green-500' 
-                            : evaluation.status === 'pending'
-                              ? 'bg-yellow-500/10 text-yellow-500'
-                              : 'bg-red-500/10 text-red-500'
-                        }`}>
+                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${evaluation.status === 'hired'
+                          ? 'bg-green-500/10 text-green-500'
+                          : evaluation.status === 'pending'
+                            ? 'bg-yellow-500/10 text-yellow-500'
+                            : 'bg-red-500/10 text-red-500'
+                          }`}>
                           {evaluation.status === 'hired' ? t('common', 'hired') :
-                           evaluation.status === 'pending' ? t('common', 'pending') :
-                           t('common', 'rejected')}
+                            evaluation.status === 'pending' ? t('common', 'pending') :
+                              t('common', 'rejected')}
                         </span>
                       </div>
                     </div>

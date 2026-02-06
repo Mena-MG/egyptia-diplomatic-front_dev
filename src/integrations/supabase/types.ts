@@ -486,7 +486,7 @@ export type Database = {
           id: string
           initiative_growth: number
           is_submitted: boolean
-          member_id: string
+          applicant_id: string
           policy_compliance: number
           task_execution: number
           team_collaboration: number
@@ -502,7 +502,7 @@ export type Database = {
           id?: string
           initiative_growth: number
           is_submitted?: boolean
-          member_id: string
+          applicant_id: string
           policy_compliance: number
           task_execution: number
           team_collaboration: number
@@ -518,7 +518,7 @@ export type Database = {
           id?: string
           initiative_growth?: number
           is_submitted?: boolean
-          member_id?: string
+          applicant_id?: string
           policy_compliance?: number
           task_execution?: number
           team_collaboration?: number
@@ -534,10 +534,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "monthly_evaluations_member_id_fkey"
-            columns: ["member_id"]
+            foreignKeyName: "monthly_evaluations_applicant_id_fkey"
+            columns: ["applicant_id"]
             isOneToOne: false
-            referencedRelation: "members"
+            referencedRelation: "applicants"
             referencedColumns: ["id"]
           },
         ]

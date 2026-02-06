@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, User, Calendar } from 'lucide-react';
+import { Plus, Search, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,13 +21,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useLanguage } from '@/i18n/LanguageContext';
 import HRLayout from '@/components/layout/HRLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
+import { format, startOfMonth, addMonths, subMonths } from 'date-fns';
+import { ar, enUS } from 'date-fns/locale';
 
 export default function EvaluationsPage() {
   const { t, language, isRTL } = useLanguage();
@@ -46,14 +51,16 @@ export default function EvaluationsPage() {
     notes: '',
   });
 
-  const { data: members } = useQuery({
-    queryKey: ['members-list'],
+  // Fetch applicants for evaluation selection (people who submitted applications from landing page)
+  const { data: applicants, isLoading: loadingApplicants } = useQuery({
+    queryKey: ['applicants-for-evaluation'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('members')
+      const { data: applicantsData } = await supabase
+        .from('applicants')
         .select('id, full_name')
         .order('full_name');
-      return data || [];
+
+      return applicantsData || [];
     },
   });
 
@@ -62,7 +69,7 @@ export default function EvaluationsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('monthly_evaluations')
-        .select('*, member:member_id(full_name)')
+        .select('*, applicant:applicant_id(full_name)')
         .order('evaluation_month', { ascending: false })
         .limit(50);
       return data || [];
@@ -72,7 +79,7 @@ export default function EvaluationsPage() {
   const createEvaluationMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('monthly_evaluations').insert({
-        member_id: selectedMember,
+        applicant_id: selectedMember,
         evaluation_month: `${selectedMonth}-01`,
         attendance_commitment: evaluation.attendance,
         task_execution: evaluation.taskExecution,
@@ -128,15 +135,77 @@ export default function EvaluationsPage() {
                         <SelectValue placeholder={t('evaluations', 'selectMember')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {members?.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
-                        ))}
+                        {loadingApplicants ? (
+                          <SelectItem value="loading" disabled>Loading applicants...</SelectItem>
+                        ) : !applicants || applicants.length === 0 ? (
+                          <SelectItem value="no-applicants" disabled>No applicants available</SelectItem>
+                        ) : (
+                          applicants.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>{t('evaluations', 'selectMonth')}</Label>
-                    <Input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          {format(new Date(`${selectedMonth}-01`), 'MMMM yyyy', { locale: language === 'ar' ? ar : enUS })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4" align="start">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const currentDate = new Date(`${selectedMonth}-01`);
+                                const newDate = subMonths(currentDate, 1);
+                                setSelectedMonth(format(newDate, 'yyyy-MM'));
+                              }}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="font-medium">
+                              {format(new Date(`${selectedMonth}-01`), 'yyyy', { locale: language === 'ar' ? ar : enUS })}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                const currentDate = new Date(`${selectedMonth}-01`);
+                                const newDate = addMonths(currentDate, 1);
+                                setSelectedMonth(format(newDate, 'yyyy-MM'));
+                              }}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {Array.from({ length: 12 }, (_, i) => {
+                              const currentYear = selectedMonth.split('-')[0];
+                              const monthValue = `${currentYear}-${String(i + 1).padStart(2, '0')}`;
+                              const isSelected = monthValue === selectedMonth;
+                              return (
+                                <Button
+                                  key={i}
+                                  variant={isSelected ? 'default' : 'ghost'}
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => setSelectedMonth(monthValue)}
+                                >
+                                  {format(new Date(2024, i, 1), 'MMM', { locale: language === 'ar' ? ar : enUS })}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -207,9 +276,9 @@ export default function EvaluationsPage() {
                           <User className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium">{ev.member?.full_name}</h3>
+                          <h3 className="font-medium">{(ev as any).applicant?.full_name}</h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
+                            <CalendarIcon className="w-3 h-3" />
                             {format(new Date(ev.evaluation_month), 'MMMM yyyy', { locale: language === 'ar' ? ar : undefined })}
                           </p>
                         </div>
